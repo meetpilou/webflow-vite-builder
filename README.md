@@ -77,15 +77,11 @@ Example:
 
 This is the CDN URL used inside Webflow.
 
-### 4.3 Create an API Key
-
-Dashboard → API → Add API Key.
-
 ---
 
 ## 5. Bunny Setup + GitHub Secrets
 
-This project deploys your JS/CSS to Bunny Storage and serves them through a Bunny Pull Zone.  
+This project deploys your JS/CSS and public files to Bunny Storage and serves them through a Bunny Pull Zone.  
 Here is exactly how to retrieve the right values for your GitHub secrets.
 
 ---
@@ -95,8 +91,7 @@ Here is exactly how to retrieve the right values for your GitHub secrets.
 For optimal performance:
 
 - Choose **SSD Storage** (faster response time)
-- Enable **Perma-Cache** on the Pull Zone
-- In your Pull Zone → **Caching** tab → enable **Smart Cache**
+- Enable **Smart Cache** via the **Caching** tab on the Pull Zone.
 
 This dramatically reduces latency and delivery time.
 
@@ -123,9 +118,6 @@ You will see:
 
 - **FTP Username** → This is your **BUNNY_STORAGE_NAME**  
 - **FTP Password** → This is your **BUNNY_STORAGE_KEY**
-
-⚠️ The FTP password is only shown once.  
-If lost, regenerate a new one.
 
 ---
 
