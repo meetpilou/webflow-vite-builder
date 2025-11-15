@@ -1,15 +1,22 @@
 # Vite Webflow Build System (Prod + Staging)
 
-A modern and beginner-friendly workflow for building and deploying JavaScript and CSS assets for Webflow using Vite, GitHub Actions, and Bunny CDN.
+![Build](https://img.shields.io/badge/build-local%20only-success)
+![Environments](https://img.shields.io/badge/env-prod%20%7C%20staging-dual)
+![CDN](https://img.shields.io/badge/cdn-Bunny.net-orange)
+![Node](https://img.shields.io/badge/node-20.x-339933)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
+A modern and beginner-friendly workflow for building and deploying JavaScript and CSS assets for Webflow using Vite and Bunny CDN, with **two environments** (staging + prod) and **intelligent semantic versioning**.
 
 This project includes:
 
 - Fast Vite dev server
-- Automatic builds for production and staging
-- Full versioning system
-- Rollback system
+- Local-only builds (no accidental CI builds)
+- Dual environment system: **staging** + **prod**
+- Intelligent versioning (prod never ahead of staging)
+- Rollback system per environment
 - CDN deployment via Bunny.net
-- Auto-loader snippet for Webflow (Slater-style)
+- Slater-style loader snippet for Webflow
 - Reset tools
 - ESLint + Prettier
 
@@ -57,7 +64,7 @@ Check installation:
 
 ## 4. Setting Up Bunny CDN
 
-This project deploys your build output to Bunny Storage and serves it through a Pull Zone CDN.
+This project deploys your build output to **Bunny Storage** and serves it through a **Bunny Pull Zone CDN**.
 
 ### 4.1 Create a Storage Zone
 
@@ -68,6 +75,8 @@ Example:
 - FTP Username: auto-generated
 - FTP Password: shown once
 
+For better performance, choose **SSD Storage** and enable **Perma-Cache**.
+
 ### 4.2 Create a Pull Zone
 
 Example:
@@ -75,84 +84,73 @@ Example:
 - Pull Zone Name: myproject
 - CDN URL: https://myproject.b-cdn.net/
 
-This is the CDN URL used inside Webflow.
+This CDN URL will be used in Webflow.
+
+### 4.3 Enable Smart Cache
+
+In your Pull Zone:
+
+- Open the **Caching** tab
+- Enable **Smart Cache**
+
+This provides smarter invalidation and better performance worldwide.
 
 ---
 
 ## 5. Bunny Setup + GitHub Secrets
 
-This project deploys your JS/CSS and public files to Bunny Storage and serves them through a Bunny Pull Zone.  
-Here is exactly how to retrieve the right values for your GitHub secrets.
+This project deploys your JS/CSS and public files to Bunny Storage and serves them through a Bunny Pull Zone. Here is how to get each value used as GitHub secrets.
 
----
+### 5.1 Retrieve the Pull Zone ID (BUNNY_PULLZONE_ID)
 
-### 5.1 Recommended Bunny Settings
-
-For optimal performance:
-
-- Choose **SSD Storage** (faster response time)
-- Enable **Smart Cache** via the **Caching** tab on the Pull Zone.
-
-This dramatically reduces latency and delivery time.
-
----
-
-### 5.2 Retrieve the Pull Zone ID (BUNNY_PULLZONE_ID)
-
-1. Go to **Pull Zones**  
-2. Find your Pull Zone in the list  
-3. Click the **3 dots** on the right  
+1. Go to **Pull Zones**
+2. Find your Pull Zone in the list
+3. Click the **three dots** on the right
 4. Select **“Copy Pull Zone ID”**
 
 This gives you the numeric ID used for cache purging.
 
----
-
-### 5.3 Retrieve the Storage Name & Storage Key
+### 5.2 Retrieve the Storage Name & Storage Key
 
 1. Go to **Storage → Your Storage Zone**
 2. Enter the zone
-3. Open the panel **“FTP & API Access”**
+3. Open **“FTP & API Access”**
 
 You will see:
 
-- **FTP Username** → This is your **BUNNY_STORAGE_NAME**  
-- **FTP Password** → This is your **BUNNY_STORAGE_KEY**
+- FTP Username → this is **BUNNY_STORAGE_NAME**
+- FTP Password → this is **BUNNY_STORAGE_KEY**
 
----
+If you lose the password, generate a new one.
 
-### 5.4 Retrieve your Account API Key
+### 5.3 Retrieve your Account API Key
 
 1. Go to **Account Settings**
-2. Navigate to **API Key**
+2. Open **API Key**
 
-Copy the **Main API Key** for your account.  
-This is used to purge Bunny CDN cache.
+Copy the **Main API Key**.  
+This becomes **BUNNY_API_KEY** and is used to purge Bunny CDN cache.
 
-This becomes:
+### 5.4 Add these secrets to GitHub
 
-- **BUNNY_API_KEY**
+In your repository:
 
----
-
-### 5.5 Add these secrets to GitHub
-
-Go to:
-
-**GitHub → Repo → Settings → Secrets → Actions → New secret**
+- Go to **Settings → Secrets and variables → Actions → New repository secret**
 
 Add:
 
-- `BUNNY_STORAGE_NAME` → Storage FTP username  
-- `BUNNY_STORAGE_KEY` → Storage FTP password  
-- `BUNNY_PULLZONE_ID` → Numeric ID copied from Pull Zone  
-- `BUNNY_API_KEY` → Bunny API key from Account Settings
+- `BUNNY_STORAGE_NAME` → Storage FTP username
+- `BUNNY_STORAGE_KEY` → Storage FTP password
+- `BUNNY_PULLZONE_ID` → Pull Zone ID (numeric)
+- `BUNNY_API_KEY` → Account API key
 
-These secrets allow the GitHub Actions workflow to:
+The GitHub Actions workflow will use these to:
 
-- Upload files to Bunny Storage  
-- Invalidate cached files  
-- Keep staging and production deployments synced
+- Upload files to Bunny Storage
+- Purge the Pull Zone cache after each deploy
+
+> Note: The workflow only deploys existing files from `dist/`.  
+> **Builds are always done locally**, so you never break production by mistake.
 
 ---
 
@@ -162,9 +160,11 @@ These secrets allow the GitHub Actions workflow to:
       prod/
         latest/
         versions/
+          versions.json
       staging/
         latest/
         versions/
+          versions.json
       snippet.html
 
     public/
@@ -191,89 +191,199 @@ These secrets allow the GitHub Actions workflow to:
 
 ## 7. What Is Vite?
 
-### Dev mode:
+Vite is a fast development server and build tool.
+
+### Dev mode
 
     yarn dev
 
-Runs at http://localhost:3000
+This starts a local server on:
 
-### Build mode:
+    http://localhost:3000
 
-Vite outputs:
+When you edit files in `src/`, the browser updates almost instantly.
+
+### Build mode
+
+For each build, Vite outputs:
 
     app.js
     app.css
     assets/
 
-These files are deployed to Bunny CDN.
+These files are what you deploy to Bunny CDN.
 
 ---
 
-## 8. Dual Build System — Prod + Staging
+## 8. Dual Build System — Prod + Staging (Intelligent Versioning)
 
-Two environments:
+This project uses two environments:
 
-- staging (Webflow preview)
-- prod (real domain)
+- **staging** → used on `*.webflow.io` (preview / QA)
+- **prod** → used on your real domain (live site)
 
-### Build commands:
+Build scripts (from `package.json`):
 
-    yarn build staging patch
-    yarn build prod patch
+Staging builds:
 
-Version increments:
+    yarn build:staging          # bump patch by default
+    yarn build:staging:minor    # bump minor
+    yarn build:staging:major    # bump major
 
-- patch
-- minor
-- major
+Production builds:
 
-Examples:
+    yarn build:prod             # bump patch if needed
+    yarn build:prod:minor       # bump minor if needed
+    yarn build:prod:major       # bump major if needed
 
-    yarn build prod minor
-    yarn build staging major
+### 8.1 How versioning works
 
-Each build:
+The version is stored in `package.json` and tracked separately per environment under:
 
-- bumps version
-- builds with Vite
-- writes to dist/{env}/latest
-- archives version: dist/{env}/versions/vX.X.X
-- updates dist/{env}/versions/versions.json
+- `dist/staging/versions/versions.json`
+- `dist/prod/versions/versions.json`
+
+**Staging rules**
+
+- Every staging build **always** increments the version (patch/minor/major).
+- The build is written to `dist/staging/latest`.
+- An archive is created under `dist/staging/versions/vX.X.X`.
+
+**Production rules (intelligent)**
+
+When you run a production build:
+
+1. It compares the latest staging version and the latest prod version.
+2. Three possible situations:
+
+**A. Staging is ahead of prod**
+
+- Example: staging = 0.0.5, prod = 0.0.4
+- Result: prod adopts **0.0.5** (no increment).
+- The staging build is copied into `dist/prod/latest`.
+
+**B. Staging equals prod**
+
+- Example: staging = 0.0.4, prod = 0.0.4
+- Result: prod **increments** the version (patch/minor/major according to the script).
+- Example: prod patch → 0.0.5
+- The new prod build is also copied back to staging, so both environments share the same version.
+
+**C. No staging build yet**
+
+- Example: first prod build on a fresh project.
+- Result: prod increments from the current `package.json` version and then copies that version to staging as well.
+
+> The key idea:
+>
+> - **Staging is never behind production.**
+> - **Prod never jumps to a version that staging doesn’t know.**
 
 ---
 
-## 9. Restore a Version
+## 9. Example Version Timeline
+
+Starting from:
+
+- package.json → 0.0.3
+- no previous builds
+
+1.  First staging build:
+
+        yarn build:staging
+
+    → staging = 0.0.4  
+    → prod still = 0.0.3 (no build yet)
+
+2.  First production build:
+
+        yarn build:prod
+
+    - staging latest = 0.0.4
+    - prod latest = 0.0.3  
+      → prod adopts 0.0.4 (no increment)  
+      → prod and staging both = 0.0.4
+
+3.  New features, you skip staging and go straight to prod:
+
+        yarn build:prod:minor
+
+    - staging latest = 0.0.4
+    - prod latest = 0.0.4  
+      → equality → prod bumps **minor** → 0.1.0  
+      → staging is automatically synced to 0.1.0
+
+4.  Later, you do a staging-only patch:
+
+        yarn build:staging
+
+    → staging = 0.1.1  
+    → prod = 0.1.0
+
+5.  When ready to push to live:
+
+        yarn build:prod
+
+    → prod adopts staging version 0.1.1 (no increment).
+
+Versions are always clean and predictable.
+
+---
+
+## 10. Restore a Version
+
+You can restore any previous version per environment.
+
+Restore production:
 
     yarn restore prod 1.2.3
+
+Restore staging:
+
     yarn restore staging 1.2.3
 
-Each environment has an independent archive.
+- For **staging**, only staging is updated.
+- For **prod**, the script also syncs staging to the restored version, so both environments remain aligned.
 
 ---
 
-## 10. Reset the Project
+## 11. Reset the Project
 
-    yarn reset
+The reset command wipes all builds and archives, and resets the version to `0.0.1`.
 
-Deletes dist/ and resets version to 0.0.1.
+    yarn reset --yes
+
+This will:
+
+- Delete `dist/` completely
+- Reset `package.json` version to `0.0.1`
+- Recreate empty folders for:
+
+      dist/prod/latest
+      dist/prod/versions/versions.json
+      dist/staging/latest
+      dist/staging/versions/versions.json
+
+> The `--yes` flag is required as a safety guard.
 
 ---
 
-## 11. Using Your Scripts Inside Webflow (Local / Staging / Prod)
+## 12. Using Your Scripts Inside Webflow (Local / Staging / Prod)
 
-There are two ways to load scripts inside Webflow:
+There are two ways to load your scripts in Webflow:
 
----
+- Local dev → Vite server
+- Staging/Prod → Bunny CDN + loader snippet
 
-### A. Local development (hot reload)
+### 12.1 Local development (Vite dev server)
 
-When running:
+When you run:
 
     yarn dev
 
-Insert these tags in Webflow → Page Settings → Before </body>:
+You can inject the local Vite scripts inside Webflow:
 
-    <!-- Local development -->
+    <!-- Local development (do NOT publish this to production) -->
     <script type="module" src="https://localhost:3000/@vite/client"></script>
     <script type="module" src="https://localhost:3000/src/main.js"></script>
 
@@ -281,119 +391,112 @@ Benefits:
 
 - Hot module reload
 - Instant JS/CSS updates
-- Real dev environment in Webflow
-- No rebuild needed
+- Real dev environment inside Webflow
+- No build required while coding
 
-⚠️ Works only on https and with CORS allowed.  
-⚠️ Do not publish live with these scripts.
+⚠ Only use this for **local testing**.  
+⚠ Do **not** publish your site with these tags.
 
 ---
 
-### B. Staging / Production (CDN loader snippet)
+### 12.2 Staging / Production (CDN loader snippet)
 
-When deploying:
+Once you’ve built your assets (staging or prod), you switch Webflow to use the **loader snippet**.
 
-    yarn build staging patch
-    yarn build prod patch
-
-Generate the environment loader snippet:
+Generate the snippet:
 
     yarn snippet https://your-project.b-cdn.net
 
-This generates:
+This creates:
 
     dist/snippet.html
 
-Paste the MINIFIED snippet into Webflow (Before </body>).
+Open `dist/snippet.html`, copy the **minified snippet**, and paste it into:
 
-This snippet automatically selects:
+- Webflow → Project Settings → Custom Code → **Before </body>**
 
-- staging on *.webflow.io
-- prod on your real domain
-- staging if URL contains ?env=staging
-
-Example output:
+Example of the minified loader:
 
     <script>document.addEventListener("DOMContentLoaded",function(){const C="https://your-project.b-cdn.net",p=new URLSearchParams(location.search),o=p.get("env");let e=o==="staging"?"staging":location.hostname.includes("webflow.io")?"staging":"prod";const u=`${C}/${e}/latest/app.js`,s=document.createElement("script");s.src=u,s.type="text/javascript",document.body.appendChild(s)});</script>
 
----
+This loader automatically:
 
-### Summary
+- Uses **staging** on `*.webflow.io`
+- Uses **prod** on your real domain
+- Forces **staging** when `?env=staging` is present in the URL
 
-| Environment | What you paste in Webflow | Use case |
-|------------|----------------------------|----------|
-| Local | Local Vite scripts | Development |
-| Staging | Loader snippet | Webflow preview |
-| Prod | Loader snippet | Real domain |
+You only maintain **one single snippet** in Webflow, and it chooses the right environment.
 
 ---
 
-## 12. ESLint + Prettier
+## 13. ESLint + Prettier
 
-Lint:
+Lint your code:
 
     yarn lint
 
-Fix:
+Fix issues automatically:
 
     yarn lint:fix
 
-Format:
+Format all files:
 
     yarn format
 
-Configs:
+Configuration files:
 
-- .eslintrc.json
-- .prettierrc
+- `.eslintrc.json`
+- `.prettierrc`
+
+They are preconfigured for modern JavaScript (ES2025), with rules like `no-unused-vars`, `prefer-const`, `no-var`, and enforced formatting via Prettier.
 
 ---
 
-## 13. Typical Workflow
+## 14. Typical Workflow
 
 1. Install dependencies:
 
-       yarn
+   yarn
 
-2. Start dev:
+2. Start local dev:
 
-       yarn dev
+   yarn dev
 
-3. Build staging:
+3. Build a staging version (before testing on Webflow):
 
-       yarn build staging patch
+   yarn build:staging
 
-4. Push to GitHub → deploy to Bunny
+4. Commit + push to GitHub → your GitHub Action deploys the **current dist/** to Bunny.
 
-5. Test on Webflow
+5. Test on your Webflow staging domain (`*.webflow.io`).
 
-6. Build production:
+6. When ready for production:
 
-       yarn build prod patch
+   yarn build:prod
 
-7. Publish Webflow
+7. Publish your Webflow site (real domain uses prod assets).
 
-8. Rollback if needed:
+8. If something goes wrong in prod:
 
-       yarn restore prod 0.0.4
-
----
-
-## 14. License
-
-MIT License (recommended for starters and boilerplates).
+   yarn restore prod 0.0.4
 
 ---
 
-## 15. You’re Ready
+## 15. License
 
-This workflow gives you:
+MIT License — you are free to use, modify, and distribute this starter in personal and commercial projects.
 
-- Vite-powered dev experience
-- CDN deployment via Bunny
-- Versioned dual builds
-- Slater-style loader
-- Webflow integration
-- Linting and formatting
+---
 
-Perfect for high-performance, maintainable Webflow projects.
+## 16. You’re Ready
+
+With this setup, you have:
+
+- A clean Vite + Webflow integration
+- Dual environments with intelligent versioning
+- Safe, local-only builds (no surprise prod builds from CI)
+- Fast global delivery via Bunny CDN
+- A simple loader snippet that automatically picks staging or prod
+- Linting and formatting baked in
+
+Perfect for high-performance, maintainable Webflow projects with a professional deployment workflow.

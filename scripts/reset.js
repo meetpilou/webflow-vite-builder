@@ -1,26 +1,72 @@
-// scripts/reset.js — Reset all environments
+// scripts/reset.js — Full reset of Prod & Staging environments — 2025
 import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
+const PKG_PATH = path.join(ROOT, 'package.json');
 const DIST = path.join(ROOT, 'dist');
-const PKG = path.join(ROOT, 'package.json');
 
 async function reset() {
-  console.log('\n🧹 Resetting project...\n');
+  console.log('\n🧨 Full project RESET\n');
 
-  await fs.remove(DIST);
-  await fs.ensureDir(DIST);
+  // ----------------------------------------------------
+  // 1. Confirm (interactive safeguard)
+  // ----------------------------------------------------
+  if (!process.argv.includes('--yes')) {
+    console.log('⚠️  This will ERASE all builds, versions, archives.');
+    console.log('    Use: yarn reset --yes\n');
+    process.exit(1);
+  }
 
-  const pkg = JSON.parse(await fs.readFile(PKG));
-  pkg.version = '0.0.1';
-  await fs.writeFile(PKG, JSON.stringify(pkg, null, 2));
+  // ----------------------------------------------------
+  // 2. Delete dist/ entirely
+  // ----------------------------------------------------
+  if (await fs.pathExists(DIST)) {
+    await fs.remove(DIST);
+    console.log('🗑️  Deleted dist/ folder.');
+  } else {
+    console.log('ℹ️  dist/ folder already removed.');
+  }
 
-  console.log('📂 Clean dist/');
-  console.log('📦 Version reset → 0.0.1');
-  console.log('\n✨ Project reset complete!\n');
+  // ----------------------------------------------------
+  // 3. Reset package.json version to 0.0.1
+  // ----------------------------------------------------
+  try {
+    const pkg = JSON.parse(await fs.readFile(PKG_PATH));
+
+    pkg.version = '0.0.1';
+
+    await fs.writeFile(PKG_PATH, JSON.stringify(pkg, null, 2));
+
+    console.log('📦 package.json version reset → 0.0.1');
+  } catch (e) {
+    console.error('❌ Could not update package.json');
+    console.error(e);
+    process.exit(1);
+  }
+
+  // ----------------------------------------------------
+  // 4. Recreate empty dist structure
+  // ----------------------------------------------------
+  const envs = ['prod', 'staging'];
+  for (const env of envs) {
+    await fs.ensureDir(path.join(DIST, env, 'latest'));
+    await fs.ensureDir(path.join(DIST, env, 'versions'));
+
+    const versionsFile = path.join(DIST, env, 'versions', 'versions.json');
+
+    await fs.writeFile(versionsFile, JSON.stringify({ latest: null, versions: {} }, null, 2));
+  }
+
+  console.log('📁 Fresh dist/ structure recreated.');
+
+  // ----------------------------------------------------
+  // 5. Done
+  // ----------------------------------------------------
+  console.log('\n✨ RESET COMPLETE — Project is clean.\n');
+  console.log('Next step: run a staging or prod build.');
 }
 
 reset();
