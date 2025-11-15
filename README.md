@@ -83,15 +83,84 @@ Dashboard → API → Add API Key.
 
 ---
 
-## 5. GitHub Secrets (Deployment)
+## 5. Bunny Setup + GitHub Secrets
 
-Add these secrets:
+This project deploys your JS/CSS to Bunny Storage and serves them through a Bunny Pull Zone.  
+Here is exactly how to retrieve the right values for your GitHub secrets.
 
-- BUNNY_FTP_USERNAME
-- BUNNY_FTP_PASSWORD
-- BUNNY_STORAGE_ZONE
-- BUNNY_PULLZONE_ID
-- BUNNY_API_KEY
+---
+
+### 5.1 Recommended Bunny Settings
+
+For optimal performance:
+
+- Choose **SSD Storage** (faster response time)
+- Enable **Perma-Cache** on the Pull Zone
+- In your Pull Zone → **Caching** tab → enable **Smart Cache**
+
+This dramatically reduces latency and delivery time.
+
+---
+
+### 5.2 Retrieve the Pull Zone ID (BUNNY_PULLZONE_ID)
+
+1. Go to **Pull Zones**  
+2. Find your Pull Zone in the list  
+3. Click the **3 dots** on the right  
+4. Select **“Copy Pull Zone ID”**
+
+This gives you the numeric ID used for cache purging.
+
+---
+
+### 5.3 Retrieve the Storage Name & Storage Key
+
+1. Go to **Storage → Your Storage Zone**
+2. Enter the zone
+3. Open the panel **“FTP & API Access”**
+
+You will see:
+
+- **FTP Username** → This is your **BUNNY_STORAGE_NAME**  
+- **FTP Password** → This is your **BUNNY_STORAGE_KEY**
+
+⚠️ The FTP password is only shown once.  
+If lost, regenerate a new one.
+
+---
+
+### 5.4 Retrieve your Account API Key
+
+1. Go to **Account Settings**
+2. Navigate to **API Key**
+
+Copy the **Main API Key** for your account.  
+This is used to purge Bunny CDN cache.
+
+This becomes:
+
+- **BUNNY_API_KEY**
+
+---
+
+### 5.5 Add these secrets to GitHub
+
+Go to:
+
+**GitHub → Repo → Settings → Secrets → Actions → New secret**
+
+Add:
+
+- `BUNNY_STORAGE_NAME` → Storage FTP username  
+- `BUNNY_STORAGE_KEY` → Storage FTP password  
+- `BUNNY_PULLZONE_ID` → Numeric ID copied from Pull Zone  
+- `BUNNY_API_KEY` → Bunny API key from Account Settings
+
+These secrets allow the GitHub Actions workflow to:
+
+- Upload files to Bunny Storage  
+- Invalidate cached files  
+- Keep staging and production deployments synced
 
 ---
 
