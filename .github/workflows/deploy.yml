@@ -84,9 +84,8 @@ jobs:
       # --------------------------------------------------
       # ⚙️ Build
       # --------------------------------------------------
-      - name: Build project
-        if: steps.check_bunny.outputs.skip == 'false'
-        run: npm run build || yarn build
+      - name: Skip build (local build required)
+        run: echo "⏭️ Build skipped — this workflow deploys existing dist/ files only."
 
       # --------------------------------------------------
       # 📂 Upload compiled files
