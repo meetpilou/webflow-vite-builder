@@ -1,0 +1,26 @@
+{
+  "latest": "0.0.3",
+  "versions": {
+    "0.0.3": {
+      "date": "2025-11-15T20:59:40.383Z",
+      "commit": "e675d15",
+      "branch": "main",
+      "env": "staging",
+      "nodeVersion": "v24.11.0",
+      "viteVersion": "^7.2.2",
+      "buildTimeMs": 238,
+      "files": {
+        "js": {
+          "path": "/app.js",
+          "sizeKB": "0.00",
+          "checksum": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+        },
+        "css": {
+          "path": "/app.css",
+          "sizeKB": "0.00"
+        }
+      },
+      "totalSizeKB": "0.00"
+    }
+  }
+}
