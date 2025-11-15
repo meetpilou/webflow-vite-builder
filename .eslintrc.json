@@ -1,0 +1,35 @@
+{
+  "env": {
+    "browser": true,
+    "es2025": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:import/recommended",
+    "plugin:n/recommended",
+    "plugin:promise/recommended",
+    "plugin:prettier/recommended"
+  ],
+  "plugins": ["prettier"],
+  "parserOptions": {
+    "ecmaVersion": "2025",
+    "sourceType": "module"
+  },
+  "rules": {
+    "strict": ["error", "global"],
+    "no-console": "warn",
+    "no-unused-vars": "error",
+    "import/order": "error",
+    "promise/always-return": "error",
+    "n/no-missing-import": "error",
+    // Ajoute des règles modernes 2025 : async/await, etc.
+    "prefer-arrow-callback": "error",
+    "prefer-const": "error",
+    "no-var": "error",
+    "prettier/prettier": "error"
+  },
+  "globals": {
+    // Si besoin pour globals Webflow ou autre
+  }
+}

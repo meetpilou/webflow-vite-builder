@@ -1,0 +1,37 @@
+{
+  "name": "vite-starter",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3000",
+    "build:prod": "node ./scripts/build.js prod patch",
+    "build:prod:minor": "node ./scripts/build.js prod minor",
+    "build:prod:major": "node ./scripts/build.js prod major",
+    "build:staging": "node ./scripts/build.js staging patch",
+    "build:staging:minor": "node ./scripts/build.js staging minor",
+    "build:staging:major": "node ./scripts/build.js staging major",
+    "restore": "node ./scripts/restore.js",
+    "restore:prod": "node ./scripts/restore.js prod",
+    "restore:staging": "node ./scripts/restore.js staging",
+    "reset": "node ./scripts/reset.js",
+    "snippet": "node ./scripts/snippet.js",
+    "format": "prettier --write .",
+    "lint": "eslint . --ext .js",
+    "lint:fix": "eslint . --ext .js --fix"
+  },
+  "devDependencies": {
+    "eslint": "8",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-n": "^17.23.1",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-promise": "^7.2.1",
+    "prettier": "^3.6.2",
+    "vite": "^7.2.2"
+  },
+  "dependencies": {
+    "fs-extra": "^11.3.2",
+    "semver": "^7.7.3"
+  }
+}

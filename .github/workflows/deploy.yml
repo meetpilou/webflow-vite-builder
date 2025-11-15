@@ -1,0 +1,229 @@
+name: Deploy to BunnyCDN
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      BUNNY_STORAGE_NAME: ${{ secrets.BUNNY_STORAGE_NAME }}
+      BUNNY_STORAGE_KEY: ${{ secrets.BUNNY_STORAGE_KEY }}
+      BUNNY_PULLZONE_ID: ${{ secrets.BUNNY_PULLZONE_ID }}
+      BUNNY_API_KEY: ${{ secrets.BUNNY_API_KEY }}
+
+    steps:
+      # --------------------------------------------------
+      # 🧰 Setup
+      # --------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # --------------------------------------------------
+      # 🧩 Check BunnyCDN secrets
+      # --------------------------------------------------
+      - name: Verify BunnyCDN secrets
+        id: check_bunny
+        shell: bash
+        run: |
+          MISSING=0
+
+          if [ -z "${BUNNY_STORAGE_NAME}" ]; then
+            echo "❌ Missing secret: BUNNY_STORAGE_NAME"
+            MISSING=1
+          fi
+
+          if [ -z "${BUNNY_PULLZONE_ID}" ]; then
+            echo "❌ Missing secret: BUNNY_PULLZONE_ID"
+            MISSING=1
+          fi
+
+          if [ -z "${BUNNY_STORAGE_KEY}" ]; then
+            echo "❌ Missing secret: BUNNY_STORAGE_KEY"
+            MISSING=1
+          fi
+
+          if [ -z "${BUNNY_API_KEY}" ]; then
+            echo "❌ Missing secret: BUNNY_ACCESS_KEY"
+            MISSING=1
+          fi
+
+          if [ $MISSING -eq 1 ]; then
+            echo "⚠️ Missing required BunnyCDN secrets — skipping deployment."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "✅ All BunnyCDN secrets are present."
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      # --------------------------------------------------
+      # 📦 Install dependencies
+      # --------------------------------------------------
+      - name: Install dependencies
+        if: steps.check_bunny.outputs.skip == 'false'
+        run: |
+          if [ -f "yarn.lock" ]; then
+            echo "📦 Installing with Yarn..."
+            yarn install --frozen-lockfile
+          elif [ -f "package-lock.json" ]; then
+            echo "📦 Installing with npm ci..."
+            npm ci
+          else
+            echo "📦 Installing with npm install..."
+            npm install
+          fi
+
+      # --------------------------------------------------
+      # ⚙️ Build
+      # --------------------------------------------------
+      - name: Build project
+        if: steps.check_bunny.outputs.skip == 'false'
+        run: npm run build || yarn build
+
+      # --------------------------------------------------
+      # 📂 Upload compiled files
+      # --------------------------------------------------
+      - name: Upload app.css
+        if: steps.check_bunny.outputs.skip == 'false'
+        shell: bash
+        run: |
+          if [ -f "dist/latest/app.css" ]; then
+            echo "⬆️ Uploading app.css..."
+            curl -sv -X PUT "https://storage.bunnycdn.com/${BUNNY_STORAGE_NAME}/app.css" \
+              -H "AccessKey: ${BUNNY_STORAGE_KEY}" \
+              --data-binary @dist/latest/app.css || echo "❌ Upload failed (curl code $?)"
+            echo "✅ app.css uploaded (if no error above)"
+          else
+            echo "⚠️ app.css not found, skipping."
+          fi
+
+      - name: Upload app.js
+        if: steps.check_bunny.outputs.skip == 'false'
+        shell: bash
+        run: |
+          if [ -f "dist/latest/app.js" ]; then
+            echo "⬆️ Uploading app.js..."
+            curl -sv -X PUT "https://storage.bunnycdn.com/${BUNNY_STORAGE_NAME}/app.js" \
+              -H "AccessKey: ${BUNNY_STORAGE_KEY}" \
+              --data-binary @dist/latest/app.js || echo "❌ Upload failed (curl code $?)"
+            echo "✅ app.js uploaded (if no error above)"
+          else
+            echo "⚠️ app.js not found, skipping."
+          fi
+
+      # --------------------------------------------------
+      # 🌍 Upload public files
+      # --------------------------------------------------
+      - name: Upload public files
+        if: steps.check_bunny.outputs.skip == 'false'
+        shell: bash
+        run: |
+          UPLOAD_DIR="dist/latest/public"
+          STORAGE_URL="https://storage.bunnycdn.com/${BUNNY_STORAGE_NAME}"
+          ACCESS_KEY="${BUNNY_STORAGE_KEY}"
+
+          if [ -d "$UPLOAD_DIR" ] && [ "$(ls -A "$UPLOAD_DIR")" ]; then
+            echo "🗂️ Uploading public files..."
+            cd "$UPLOAD_DIR"
+
+            for file in *; do
+              if [[ "$file" == .* ]] || [ ! -s "$file" ]; then
+                echo "⚠️ Skipping $file (hidden or empty)"
+                continue
+              fi
+
+              echo "⬆️ Uploading $file..."
+              if curl -sf -X PUT "$STORAGE_URL/$file" \
+                -H "AccessKey: $ACCESS_KEY" \
+                --data-binary @"$file" >/dev/null; then
+                echo "✅ Uploaded $file"
+              else
+                echo "❌ Failed to upload $file"
+              fi
+            done
+          else
+            echo "⚠️ No public files to upload."
+          fi
+
+      # --------------------------------------------------
+      # 🖼️ Upload assets
+      # --------------------------------------------------
+      - name: Upload assets
+        if: steps.check_bunny.outputs.skip == 'false'
+        shell: bash
+        run: |
+          ACCESS_KEY="${BUNNY_STORAGE_KEY}"
+          BASE_URL="https://storage.bunnycdn.com/${BUNNY_STORAGE_NAME}/assets"
+          ASSET_DIR="dist/latest/assets"
+
+          for FOLDER in images fonts icons svg; do
+            UPLOAD_DIR="$ASSET_DIR/$FOLDER"
+            STORAGE_URL="$BASE_URL/$FOLDER"
+
+            if [ -d "$UPLOAD_DIR" ] && [ "$(ls -A "$UPLOAD_DIR")" ]; then
+              echo "🗂️ Uploading $FOLDER..."
+              cd "$UPLOAD_DIR"
+
+              for file in *; do
+                if [[ "$file" == .* ]] || [ ! -s "$file" ]; then
+                  echo "⚠️ Skipping $file (hidden or empty)"
+                  continue
+                fi
+
+                echo "⬆️ Uploading $file..."
+                if curl -sf -X PUT "$STORAGE_URL/$file" \
+                  -H "AccessKey: $ACCESS_KEY" \
+                  --data-binary @"$file" >/dev/null; then
+                  echo "✅ Uploaded $file"
+                else
+                  echo "❌ Failed to upload $file"
+                fi
+              done
+
+              cd - >/dev/null
+            else
+              echo "⚠️ No files to upload in $FOLDER."
+            fi
+          done
+
+      # --------------------------------------------------
+      # 🚀 Purge BunnyCDN Cache (uses Pull Zone **ID**)
+      # --------------------------------------------------
+      - name: Purge Bunny.net Cache (instant worldwide)
+        if: steps.check_bunny.outputs.skip == 'false'
+        shell: bash
+        run: |
+          echo "🧹 Purging cache for Pull Zone ID: ${BUNNY_PULLZONE_ID}"
+
+          RESPONSE=$(curl -s -X POST "https://api.bunny.net/pullzone/${BUNNY_PULLZONE_ID}/purgeCache" \
+            -H "AccessKey: ${BUNNY_API_KEY}" \
+            -H "accept: application/json" \
+            -w "HTTPSTATUS:%{http_code}")
+
+          BODY=$(echo "$RESPONSE" | sed -e 's/HTTPSTATUS:.*//g')
+          STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+
+          echo "🔎 Bunny API response: $BODY"
+          echo "🔎 HTTP status: $STATUS"
+
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]; then
+            echo "✅ Cache purged."
+          else
+            echo "❌ Failed to purge cache (status $STATUS)"
+            exit 1
+          fi
+
+      # --------------------------------------------------
+      # ✅ Done
+      # --------------------------------------------------
+      - name: Post Setup Node.js
+        if: steps.check_bunny.outputs.skip == 'false'
+        run: echo "🎉 Deployment completed successfully!"
