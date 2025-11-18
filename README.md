@@ -384,8 +384,8 @@ When you run:
 You can inject the local Vite scripts inside Webflow:
 
     <!-- Local development (do NOT publish this to production) -->
-    <script type="module" src="https://localhost:3000/@vite/client"></script>
-    <script type="module" src="https://localhost:3000/src/main.js"></script>
+    <script type="module" src="http://localhost:3000/@vite/client"></script>
+    <script type="module" src="http://localhost:3000/src/main.js"></script>
 
 Benefits:
 
