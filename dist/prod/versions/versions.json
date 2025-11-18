@@ -1,47 +1,20 @@
 {
-  "latest": "0.0.4",
+  "latest": "0.0.2",
   "versions": {
     "0.0.2": {
-      "date": "2025-11-15T20:59:21.900Z",
-      "commit": "e675d15",
-      "branch": "main",
+      "version": "0.0.2",
       "env": "prod",
-      "nodeVersion": "v24.11.0",
-      "viteVersion": "^7.2.2",
-      "buildTimeMs": 295,
-      "files": {
-        "js": {
-          "path": "/app.js",
-          "sizeKB": "0.00",
-          "checksum": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
-        },
-        "css": {
-          "path": "/app.css",
-          "sizeKB": "0.00"
-        }
-      },
-      "totalSizeKB": "0.00"
-    },
-    "0.0.4": {
-      "date": "2025-11-15T20:59:51.661Z",
-      "commit": "e675d15",
+      "date": "2025-11-18T11:16:32.058Z",
+      "commit": "d5bbafc",
       "branch": "main",
-      "env": "prod",
       "nodeVersion": "v24.11.0",
-      "viteVersion": "^7.2.2",
-      "buildTimeMs": 235,
-      "files": {
-        "js": {
-          "path": "/app.js",
-          "sizeKB": "0.00",
-          "checksum": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
-        },
-        "css": {
-          "path": "/app.css",
-          "sizeKB": "0.00"
-        }
+      "js": {
+        "sizeKB": "0.00",
+        "checksum": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
       },
-      "totalSizeKB": "0.00"
+      "css": {
+        "sizeKB": "0.00"
+      }
     }
   }
 }
