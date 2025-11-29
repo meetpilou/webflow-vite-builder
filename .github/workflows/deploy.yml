@@ -71,7 +71,7 @@ jobs:
         if: steps.check_bunny.outputs.skip == 'false'
         run: |
           if [ -f "yarn.lock" ]; then
-            yarn install --frozen-lockfile
+            yarn install
           else
             npm install
           fi
