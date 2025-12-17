@@ -401,31 +401,115 @@ Benefits:
 
 ### 12.2 Staging / Production (CDN loader snippet)
 
-Once you’ve built your assets (staging or prod), you switch Webflow to use the **loader snippet**.
+Once your assets are built (**staging** or **production**), Webflow loads them through a **single CDN loader setup**.
 
 Generate the snippet:
 
-    yarn snippet https://your-project.b-cdn.net
+```bash
+yarn snippet https://your-project.b-cdn.net
+```
 
 This creates:
 
-    dist/snippet.html
+```txt
+dist/snippet.html
+```
 
-Open `dist/snippet.html`, copy the **minified snippet**, and paste it into:
+Open `dist/snippet.html`, copy the **minified loader snippets**, and paste them into:
 
-- Webflow → Project Settings → Custom Code → **Before </body>**
+- **Webflow → Project Settings → Custom Code → Inside `<head>`**
 
-Example of the minified loader:
+> ℹ️ CSS and JS are loaded via **two independent snippets**. You may enable or disable either one if needed.
 
-    <script>document.addEventListener("DOMContentLoaded",function(){const C="https://your-project.b-cdn.net",p=new URLSearchParams(location.search),o=p.get("env");let e=o==="staging"?"staging":location.hostname.includes("webflow.io")?"staging":"prod";const u=`${C}/${e}/latest/app.js`,s=document.createElement("script");s.src=u,s.type="text/javascript",document.body.appendChild(s)});</script>
+---
 
-This loader automatically:
+#### Auto environment loaders (minified)
 
-- Uses **staging** on `*.webflow.io`
-- Uses **prod** on your real domain
-- Forces **staging** when `?env=staging` is present in the URL
+**CSS loader**
 
-You only maintain **one single snippet** in Webflow, and it chooses the right environment.
+```html
+<!-- -------------------- AUTO ENV CSS LOADER -------------------- -->
+<script>
+  (function () {
+    const C = 'https://your-project.b-cdn.net',
+      p = new URLSearchParams(location.search),
+      o = p.get('env'),
+      e =
+        o === 'staging' ? 'staging' : location.hostname.includes('webflow.io') ? 'staging' : 'prod',
+      u = `${C}/${e}/latest/app.css`,
+      l = document.createElement('link');
+    ((l.rel = 'stylesheet'), (l.href = u), document.head.appendChild(l));
+  })();
+</script>
+```
+
+**JS loader**
+
+```html
+<!-- -------------------- AUTO ENV JS LOADER -------------------- -->
+<script>
+  (function () {
+    const C = 'https://your-project.b-cdn.net',
+      p = new URLSearchParams(location.search),
+      o = p.get('env'),
+      e =
+        o === 'staging' ? 'staging' : location.hostname.includes('webflow.io') ? 'staging' : 'prod',
+      u = `${C}/${e}/latest/app.js`,
+      s = document.createElement('script');
+    ((s.src = u), (s.type = 'text/javascript'), (s.defer = !0), document.head.appendChild(s));
+  })();
+</script>
+```
+
+---
+
+#### How the loader works
+
+The loader automatically selects the correct environment:
+
+- 🚧 **Staging**
+  - Used on `*.webflow.io`
+  - Forced when `?env=staging` is present in the URL
+- 💎 **Production**
+  - Used on the real (custom) domain
+
+You maintain **one single loader configuration** in Webflow, and it always points to the correct CDN environment.
+
+---
+
+#### Explicit CDN URLs (debug / QA / fallback)
+
+If you need to bypass the auto loader (for testing or debugging), use the direct CDN URLs below.
+
+**CSS**
+
+```html
+<!-- 🚧 Staging -->
+<link href="https://your-project.b-cdn.net/staging/latest/app.css" rel="stylesheet" />
+
+<!-- 💎 Production -->
+<link href="https://your-project.b-cdn.net/prod/latest/app.css" rel="stylesheet" />
+```
+
+**JS**
+
+```html
+<!-- 🚧 Staging -->
+<script src="https://your-project.b-cdn.net/staging/latest/app.js" defer></script>
+
+<!-- 💎 Production -->
+<script src="https://your-project.b-cdn.net/prod/latest/app.js" defer></script>
+```
+
+---
+
+#### Why this approach
+
+- ✅ Single snippet setup in Webflow
+- ✅ Automatic environment detection
+- ✅ No manual switch between staging and production
+- ✅ Compatible with Webflow + Vite workflows
+- ✅ Easy fallback with explicit CDN URLs
 
 ---
 

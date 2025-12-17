@@ -8,86 +8,56 @@ if (!CDN) {
   process.exit(1);
 }
 
-/* --- CSS – Clean --- */
+/* AUTO ENV SNIPPETS (MINIFIED) */
 
-const cssClean = `
-<!-- -------------------- AUTO ENV CSS LOADER — CLEAN -------------------- -->
-<script>
-(function () {
-  const CDN = "${CDN}";
-
-  const params = new URLSearchParams(location.search);
-  const override = params.get("env");
-
-  const env =
-    override === "staging"
-      ? "staging"
-      : location.hostname.includes("webflow.io")
-      ? "staging"
-      : "prod";
-
-  const href = \`\${CDN}/\${env}/latest/app.css\`;
-
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = href;
-
-  document.head.appendChild(link);
-})();
-</script>
-`;
-
-/* --- CSS – Minified --- */
-
-const cssMinified = `
-<!-- -------------------- AUTO ENV CSS LOADER — MINIFIED -------------------- -->
+/* --- CSS – Auto ENV --- */
+const cssAuto = `
+<!-- -------------------- AUTO ENV CSS LOADER -------------------- -->
 <script>(function(){const C="${CDN}",p=new URLSearchParams(location.search),o=p.get("env"),e=o==="staging"?"staging":location.hostname.includes("webflow.io")?"staging":"prod",u=\`\${C}/\${e}/latest/app.css\`,l=document.createElement("link");l.rel="stylesheet",l.href=u,document.head.appendChild(l)})();</script>
 `;
 
-/* --- JS – Clean --- */
-
-const jsClean = `
-<!-- -------------------- AUTO ENV JS LOADER — CLEAN -------------------- -->
-<script>
-(function () {
-  const CDN = "${CDN}";
-
-  const params = new URLSearchParams(location.search);
-  const override = params.get("env");
-
-  const env =
-    override === "staging"
-      ? "staging"
-      : location.hostname.includes("webflow.io")
-      ? "staging"
-      : "prod";
-
-  const src = \`\${CDN}/\${env}/latest/app.js\`;
-
-  const script = document.createElement("script");
-  script.src = src;
-  script.type = "text/javascript";
-  script.defer = true;
-
-  document.head.appendChild(script);
-})();
-</script>
-`;
-
-/* --- JS – Minified --- */
-const jsMinified = `
-<!-- -------------------- AUTO ENV JS LOADER — MINIFIED -------------------- -->
+/* --- JS – Auto ENV --- */
+const jsAuto = `
+<!-- -------------------- AUTO ENV JS LOADER -------------------- -->
 <script>(function(){const C="${CDN}",p=new URLSearchParams(location.search),o=p.get("env"),e=o==="staging"?"staging":location.hostname.includes("webflow.io")?"staging":"prod",u=\`\${C}/\${e}/latest/app.js\`,s=document.createElement("script");s.src=u,s.type="text/javascript",s.defer=!0,document.head.appendChild(s)})();</script>
 `;
 
-/* --- Final output --- */
+/* EXPLICIT URLS (STAGING / PROD) */
+
+/* --- CSS – Explicit --- */
+const cssExplicit = `
+<!-- -------------------- CSS — EXPLICIT URLS -------------------- -->
+
+<!-- 🚧 Staging -->
+<link href="${CDN}/staging/latest/app.css" rel="stylesheet" />
+
+<!-- 💎 Production -->
+<link href="${CDN}/prod/latest/app.css" rel="stylesheet" />
+`;
+
+/* --- JS – Explicit --- */
+const jsExplicit = `
+<!-- -------------------- JS — EXPLICIT URLS -------------------- -->
+
+<!-- 🚧 Staging -->
+<script src="${CDN}/staging/latest/app.js" defer></script>
+
+<!-- 💎 Production -->
+<script src="${CDN}/prod/latest/app.js" defer></script>
+`;
+
+/* FINAL OUTPUT */
 
 const output = `
 <!-- -------------------- GENERATED SNIPPETS (COPY / PASTE) -------------------- -->
 
-${cssMinified}
+${cssAuto}
 
-${jsMinified}
+${jsAuto}
+
+${cssExplicit}
+
+${jsExplicit}
 `;
 
 await fs.outputFile('./dist/snippet.html', output);
