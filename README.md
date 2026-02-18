@@ -6,8 +6,6 @@
 ![Node](https://img.shields.io/badge/node-20.x-339933)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-🌐 [Version française → README-FR.md](./README-FR.md)
-
 ---
 
 A modern workflow for building and deploying JavaScript and CSS assets for Webflow using Vite and Bunny CDN. Two environments (staging + prod), semantic versioning on prod only, and direct deployment from your machine — no GitHub Actions required.
@@ -140,6 +138,50 @@ This key is used to purge the CDN cache after each deployment.
 2. Go to **Account Settings**
 3. Click the **API** tab
 4. Copy your **API Key**
+
+### 4.4 Configure browser cache for JS and CSS files
+
+By default, Bunny CDN tells browsers to cache your files for a long time. This is great for static assets like images, but problematic for your `app.js` and `app.css` — the browser might serve a stale version even after you've deployed a new one.
+
+The fix: tell the browser **never to cache** JS and CSS files. The CDN still caches them on its edge servers (fast delivery), but every time the browser loads the page it asks Bunny for the freshest version.
+
+There are two ways to set this up. **Use the Edge Rule** — it's more precise and only affects JS/CSS.
+
+#### Option A — Edge Rule (recommended)
+
+An Edge Rule lets you override the browser cache time for specific file types only.
+
+1. In your Pull Zone, go to **Edge rules** in the left menu
+2. Click **Add rule**
+3. Fill in:
+   - **Description**: `Javascript and CSS Files`
+   - **Action**: `Override Browser Cache Time` → Cache Time In Seconds: `0`
+   - **Condition**: File Extension → Match any → add `js` and `css`
+4. Save the rule
+
+With `Cache Time In Seconds: 0`, Bunny sends a `Cache-Control: no-cache` header to the browser for every `.js` and `.css` request. The browser always revalidates with the CDN before using a cached copy.
+
+> ✅ Images, fonts, and other assets are unaffected — they keep their normal long cache time.
+
+#### Option B — Global setting (simpler but broader)
+
+If you prefer not to use Edge Rules, you can set the browser cache globally:
+
+1. In your Pull Zone, go to **Caching → General**
+2. Under **Browser cache expiration time**, select **Override: do not cache**
+3. Save
+
+> ⚠️ This disables browser caching for **all files** served by this Pull Zone, including images and fonts. Use Option A if you want finer control.
+
+#### Why this matters
+
+This project purges the **Bunny CDN cache** on every deploy (`yarn build`, `yarn dev`). But the CDN cache and the browser cache are separate layers:
+
+```
+Browser cache  →  Bunny CDN edge cache  →  Bunny Storage (origin)
+```
+
+Even after purging the CDN, a browser that has cached `app.js` locally will keep using its old copy until the browser cache expires. Setting the browser cache to `0` ensures users always get the latest version immediately after a deploy.
 
 ---
 
