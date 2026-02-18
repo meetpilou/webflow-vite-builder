@@ -19,7 +19,7 @@ export default defineConfig({
       '@setup': resolve(__dirname, 'src/js/setup'),
       '@modules': resolve(__dirname, 'src/js/modules'),
       '@utils': resolve(__dirname, 'src/js/utils'),
-      '@css': resolve(__dirname, 'src/css'),
+      '@css': resolve(__dirname, 'src/scss'),
     },
   },
 

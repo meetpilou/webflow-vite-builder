@@ -1,14 +1,18 @@
-// scripts/build.js — Dual Environment Intelligent Versioning (Prod + Staging) — 2025
-// ----------------------------------------------------------------------------------
-// This script builds, versions and archives the output for two environments:
-// "staging" and "prod".
+// scripts/build.js — Production Build with Intelligent Versioning — 2025
+// -----------------------------------------------------------------------
+// Builds, versions and archives the prod output, then deploys to Bunny CDN.
+// Staging is NOT versioned — use yarn dev for staging (auto-deploy on save).
 //
-// NEW RULE (2025):
-//   - Only JS and CSS files are versioned.
-//   - The /assets folder is stored ONCE per environment, inside /latest.
-//   - Versions contain ONLY app.js + app.css (lightweight, no duplication).
+// Usage:
+//   yarn build          → prod build, bump patch (0.0.1 → 0.0.2)
+//   yarn build:minor    → prod build, bump minor (0.0.1 → 0.1.0)
+//   yarn build:major    → prod build, bump major (0.0.1 → 1.0.0)
 //
-// This improves storage usage dramatically and makes restores instant.
+// Versioning logic:
+//   Case A — staging build exists and is ahead of prod → prod adopts staging version
+//   Case B — staging == prod (or no staging) → prod bumps version and rebuilds
+//
+// Only app.js + app.css are archived. Assets stay in /latest only.
 
 import { execSync } from 'child_process';
 import fs from 'fs-extra';
@@ -16,6 +20,7 @@ import path from 'path';
 import semver from 'semver';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { deployEnv } from './bunny.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -23,7 +28,29 @@ const PKG_PATH = path.join(ROOT, 'package.json');
 const DIST = path.join(ROOT, 'dist');
 
 // ------------------------------------------------------------
-// Helpers: Git info, checksums, sizes
+// Load .env file
+// ------------------------------------------------------------
+async function loadEnv() {
+  const envFile = path.join(ROOT, '.env');
+  if (!(await fs.pathExists(envFile))) {
+    console.error('❌ .env file not found. Copy .env.example and fill in your credentials.');
+    process.exit(1);
+  }
+
+  const content = await fs.readFile(envFile, 'utf-8');
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex === -1) continue;
+    const key = trimmed.slice(0, eqIndex).trim();
+    const val = trimmed.slice(eqIndex + 1).trim().replace(/^["']|["']$/g, '');
+    if (!process.env[key]) process.env[key] = val;
+  }
+}
+
+// ------------------------------------------------------------
+// Helpers
 // ------------------------------------------------------------
 function getGitCommit() {
   try {
@@ -52,57 +79,54 @@ async function fileSizeKB(file) {
 }
 
 // ------------------------------------------------------------
-// Load last version pointer for an env from versions.json
+// Load latest prod version from versions.json
 // ------------------------------------------------------------
-async function loadLatestVersion(env) {
-  const versionsFile = path.join(DIST, env, 'versions', 'versions.json');
+async function loadLatestProdVersion() {
+  const versionsFile = path.join(DIST, 'prod', 'versions', 'versions.json');
   if (!(await fs.pathExists(versionsFile))) return null;
-
   const data = JSON.parse(await fs.readFile(versionsFile));
   return data.latest || null;
 }
 
 // ------------------------------------------------------------
-// Generate version metadata (size, checksum, git info, date...)
+// Read current staging version from dist/staging if it exists
+// Staging has no versions.json — we read app.js mtime as a proxy
+// and use package.json version as the reference point.
 // ------------------------------------------------------------
-async function generateMeta(env, version) {
-  const ENV_ROOT = path.join(DIST, env, 'latest');
-  const jsFile = path.join(ENV_ROOT, 'app.js');
-  const cssFile = path.join(ENV_ROOT, 'app.css');
+async function stagingExists() {
+  const jsFile = path.join(DIST, 'staging', 'app.js');
+  return fs.pathExists(jsFile);
+}
 
-  const jsSize = await fileSizeKB(jsFile);
-  const cssSize = await fileSizeKB(cssFile);
+// ------------------------------------------------------------
+// Generate version metadata for prod archive
+// ------------------------------------------------------------
+async function generateMeta(version, prodLatest) {
+  const jsFile = path.join(prodLatest, 'app.js');
+  const cssFile = path.join(prodLatest, 'app.css');
 
   return {
     version,
-    env,
+    env: 'prod',
     date: new Date().toISOString(),
     commit: getGitCommit(),
     branch: getBranch(),
     nodeVersion: process.version,
     js: {
-      sizeKB: jsSize,
+      sizeKB: await fileSizeKB(jsFile),
       checksum: await checksum(jsFile),
     },
     css: {
-      sizeKB: cssSize,
+      sizeKB: await fileSizeKB(cssFile),
     },
   };
 }
 
 // ------------------------------------------------------------
-// Archive version — ONLY app.js + app.css (NO ASSETS)
+// Archive prod version — ONLY app.js + app.css
 // ------------------------------------------------------------
-//
-// IMPORTANT: We do NOT copy assets into version archives.
-// Assets live once under /latest/assets for each environment.
-//
-// This avoids heavy duplication and keeps versions extremely light.
-//
-async function archiveVersion(env, version) {
-  const ENV_ROOT = path.join(DIST, env);
-  const LATEST = path.join(ENV_ROOT, 'latest');
-  const VERSIONS = path.join(ENV_ROOT, 'versions');
+async function archiveProdVersion(version, prodLatest) {
+  const VERSIONS = path.join(DIST, 'prod', 'versions');
   const VERSIONS_JSON = path.join(VERSIONS, 'versions.json');
 
   await fs.ensureDir(VERSIONS);
@@ -110,153 +134,95 @@ async function archiveVersion(env, version) {
   const versionDir = path.join(VERSIONS, `v${version}`);
   await fs.ensureDir(versionDir);
 
-  // Only copy versionable files — app.js + app.css
-  const filesToCopy = ['app.js', 'app.css'];
-
-  for (const file of filesToCopy) {
-    const src = path.join(LATEST, file);
-    const dest = path.join(versionDir, file);
+  for (const file of ['app.js', 'app.css']) {
+    const src = path.join(prodLatest, file);
     if (await fs.pathExists(src)) {
-      await fs.copy(src, dest);
+      await fs.copy(src, path.join(versionDir, file));
     }
   }
 
-  // Update versions.json
   let versions = { latest: version, versions: {} };
   if (await fs.pathExists(VERSIONS_JSON)) {
     versions = JSON.parse(await fs.readFile(VERSIONS_JSON));
   }
 
   versions.latest = version;
-  versions.versions[version] = await generateMeta(env, version);
+  versions.versions[version] = await generateMeta(version, prodLatest);
 
   await fs.writeFile(VERSIONS_JSON, JSON.stringify(versions, null, 2));
 }
 
 // ------------------------------------------------------------
-// MAIN BUILD LOGIC
+// MAIN BUILD LOGIC — prod only
 // ------------------------------------------------------------
 async function build() {
-  console.log('\n🚀 Starting build...\n');
+  console.log('\n🚀 Starting production build...\n');
 
-  const ENV = process.argv[2];
-  const increment = process.argv[3] || 'patch';
+  await loadEnv();
 
-  if (!['prod', 'staging'].includes(ENV)) {
-    console.error('❌ Usage: yarn build [prod|staging] [patch|minor|major]');
-    process.exit(1);
-  }
+  const increment = process.argv[2] || 'patch';
 
   if (!['patch', 'minor', 'major'].includes(increment)) {
-    console.error('❌ Invalid increment: patch | minor | major');
+    console.error('❌ Invalid increment. Use: yarn build | yarn build:minor | yarn build:major');
     process.exit(1);
   }
 
   await fs.ensureDir(DIST);
-  const ENV_ROOT = path.join(DIST, ENV);
-  const LATEST = path.join(ENV_ROOT, 'latest');
 
-  // Ensure environment directories exist
-  await fs.ensureDir(LATEST);
+  const PROD_LATEST = path.join(DIST, 'prod', 'latest');
+  const STAGING_DIR = path.join(DIST, 'staging');
 
-  // Load package.json
+  await fs.ensureDir(PROD_LATEST);
+
   const pkg = JSON.parse(await fs.readFile(PKG_PATH));
-  let currentVersion = pkg.version;
-
-  // Load latest versions for staging and prod
-  const stagingVersion = await loadLatestVersion('staging');
-  const prodVersion = await loadLatestVersion('prod');
+  const currentVersion = pkg.version;
+  const prodVersion = await loadLatestProdVersion();
+  const hasStagingBuild = await stagingExists();
 
   let nextVersion;
 
   // ------------------------------------------------------------
-  // 🔵 STAGING BUILD
+  // Case A — A staging build exists → prod adopts it directly
+  // No rebuild needed, we copy staging files to prod.
   // ------------------------------------------------------------
-  if (ENV === 'staging') {
-    nextVersion = semver.inc(currentVersion, increment);
-    pkg.version = nextVersion;
+  if (hasStagingBuild) {
+    // Prod bumps from its own last version, or from package.json
+    const baseVersion = prodVersion || currentVersion;
+    nextVersion = semver.inc(baseVersion, increment);
 
-    console.log(`📦 Staging build → bump to v${nextVersion}`);
+    // If prod had a previous version and staging already matches, just adopt
+    // Otherwise bump normally
+    console.log(`📌 Staging build found → Prod adopts staging files → v${nextVersion}`);
 
-    await fs.writeFile(PKG_PATH, JSON.stringify(pkg, null, 2));
-
-    // Build Vite into dist/staging/latest
-    process.env.VITE_BUILD_OUTDIR = LATEST;
-    execSync('vite build', { stdio: 'inherit' });
-
-    await archiveVersion('staging', nextVersion);
-
-    console.log(`\n✨ Staging build complete → v${nextVersion}\n`);
-    return;
-  }
-
-  // ------------------------------------------------------------
-  // 🔴 PROD BUILD LOGIC
-  // ------------------------------------------------------------
-  console.log('🟥 Production build logic');
-
-  const lastStaging = stagingVersion || currentVersion;
-  const lastProd = prodVersion || currentVersion;
-
-  // CASE A — Staging is ahead → Prod adopts staging version
-  if (stagingVersion && semver.gt(stagingVersion, lastProd)) {
-    nextVersion = stagingVersion;
-
-    console.log(`📌 Staging ahead → Prod adopts v${nextVersion}`);
-
-    const src = path.join(DIST, 'staging', 'latest');
-    await fs.copy(src, LATEST);
+    await fs.copy(STAGING_DIR, PROD_LATEST);
 
     pkg.version = nextVersion;
     await fs.writeFile(PKG_PATH, JSON.stringify(pkg, null, 2));
 
-    await archiveVersion('prod', nextVersion);
+    await archiveProdVersion(nextVersion, PROD_LATEST);
+    await deployEnv('prod', PROD_LATEST);
 
-    console.log(`\n✅ Production synced to staging version v${nextVersion}\n`);
+    console.log(`\n✅ Production build complete → v${nextVersion}\n`);
     return;
   }
 
-  // CASE B — staging == prod → bump version
-  if (semver.eq(lastStaging, lastProd)) {
-    nextVersion = semver.inc(currentVersion, increment);
+  // ------------------------------------------------------------
+  // Case B — No staging build → rebuild from source for prod
+  // ------------------------------------------------------------
+  nextVersion = semver.inc(prodVersion || currentVersion, increment);
 
-    console.log(`🔧 Prod bump (staging==prod) → next version = v${nextVersion}`);
-
-    pkg.version = nextVersion;
-    await fs.writeFile(PKG_PATH, JSON.stringify(pkg, null, 2));
-
-    process.env.VITE_BUILD_OUTDIR = LATEST;
-    execSync('vite build', { stdio: 'inherit' });
-
-    await archiveVersion('prod', nextVersion);
-
-    // Sync staging with the new prod version
-    const stagingLatest = path.join(DIST, 'staging', 'latest');
-    await fs.copy(LATEST, stagingLatest);
-    await archiveVersion('staging', nextVersion);
-
-    console.log(`\n✨ Prod build complete → v${nextVersion} (staging synced)\n`);
-    return;
-  }
-
-  // CASE C — First prod build
-  nextVersion = semver.inc(currentVersion, increment);
-  console.log(`🔨 First prod build → bump to v${nextVersion}`);
+  console.log(`🔨 No staging build found → Building prod from source → v${nextVersion}`);
 
   pkg.version = nextVersion;
   await fs.writeFile(PKG_PATH, JSON.stringify(pkg, null, 2));
 
-  process.env.VITE_BUILD_OUTDIR = LATEST;
-  execSync('vite build', { stdio: 'inherit' });
+  process.env.VITE_BUILD_OUTDIR = PROD_LATEST;
+  execSync('vite build', { stdio: 'inherit', cwd: ROOT });
 
-  await archiveVersion('prod', nextVersion);
+  await archiveProdVersion(nextVersion, PROD_LATEST);
+  await deployEnv('prod', PROD_LATEST);
 
-  // Shadow sync staging
-  const stagingLatest = path.join(DIST, 'staging', 'latest');
-  await fs.copy(LATEST, stagingLatest);
-  await archiveVersion('staging', nextVersion);
-
-  console.log(`\n✨ First production build → v${nextVersion}\n`);
+  console.log(`\n✨ Production build complete → v${nextVersion}\n`);
 }
 
 build();

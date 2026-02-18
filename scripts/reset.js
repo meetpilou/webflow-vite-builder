@@ -1,13 +1,12 @@
 // scripts/reset.js — Full reset of Prod & Staging environments — 2025
 // ------------------------------------------------------------------
-// This script wipes the entire dist/ folder, resets package.json version
-// and recreates a fresh empty environment structure, including versions.json
-// files for both "prod" and "staging".
+// Wipes the entire dist/ folder, resets package.json version to 0.0.1
+// and recreates a fresh empty environment structure.
 //
-// After running: yarn reset --yes
-// You can immediately rebuild with:
-//   yarn build staging
-//   yarn build prod
+// Staging structure: dist/staging/  (no versioning, no /latest)
+// Prod structure:    dist/prod/latest/ + dist/prod/versions/
+//
+// Usage: yarn reset --yes
 
 import fs from 'fs-extra';
 import path from 'path';
@@ -45,11 +44,8 @@ async function reset() {
   // --------------------------------------------------------------------
   try {
     const pkg = JSON.parse(await fs.readFile(PKG_PATH));
-
     pkg.version = '0.0.1';
-
     await fs.writeFile(PKG_PATH, JSON.stringify(pkg, null, 2));
-
     console.log('📦 package.json version reset → 0.0.1');
   } catch (e) {
     console.error('❌ Could not update package.json');
@@ -58,25 +54,25 @@ async function reset() {
   }
 
   // --------------------------------------------------------------------
-  // 4. Recreate empty dist structure for prod + staging
+  // 4. Recreate empty dist structure
+  //
+  //   dist/staging/              ← no versioning, files sit here directly
+  //   dist/prod/latest/          ← versioned prod builds
+  //   dist/prod/versions/        ← prod archives
   // --------------------------------------------------------------------
-  const envs = ['prod', 'staging'];
+  await fs.ensureDir(path.join(DIST, 'staging'));
+  await fs.ensureDir(path.join(DIST, 'prod', 'latest'));
+  await fs.ensureDir(path.join(DIST, 'prod', 'versions'));
 
-  for (const env of envs) {
-    await fs.ensureDir(path.join(DIST, env, 'latest'));
-    await fs.ensureDir(path.join(DIST, env, 'versions'));
-
-    const versionsFile = path.join(DIST, env, 'versions', 'versions.json');
-
-    await fs.writeFile(versionsFile, JSON.stringify({ latest: null, versions: {} }, null, 2));
-  }
+  const prodVersionsFile = path.join(DIST, 'prod', 'versions', 'versions.json');
+  await fs.writeFile(prodVersionsFile, JSON.stringify({ latest: null, versions: {} }, null, 2));
 
   // --------------------------------------------------------------------
   // 5. Done
   // --------------------------------------------------------------------
   console.log('📁 Fresh dist/ structure recreated.');
   console.log('\n✨ RESET COMPLETE — Project is clean.\n');
-  console.log('Next step: run a staging or prod build.');
+  console.log('Next step: run yarn dev or yarn build:prod.');
 }
 
 reset();
