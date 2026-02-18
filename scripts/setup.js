@@ -60,7 +60,7 @@ const CSS_STARTERS = {
   },
 
   postcss: {
-    folder: 'pcss',
+    folder: 'css',
     filename: 'main.css',
     content: '',
   },
